@@ -89,9 +89,6 @@ $IPTABLES -A INPUT -p tcp -s $IP_PESCE_PILOTA --dport $SSH -j ACCEPT
 # LOG unauthorized SSH connections
 $IPTABLES -A INPUT -p tcp -m state --state NEW --dport $SSH -j LOG --log-prefix "INPUT CHAIN - SSH NOT AUTH "
 
-# HTTP TO SERVER
-$IPTABLES -A INPUT -p tcp -m state --state NEW --dport http -j ACCEPT
-
 # Allow ping WAN interface
 $IPTABLES -A INPUT -i $IFACE_WAN -p icmp -j ACCEPT
 
