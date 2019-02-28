@@ -10,10 +10,9 @@ Debian 9 on apu4c2 (https://www.pcengines.ch/apu4c2.htm)
 But you can use your favourite distro.
 
 ### Interfaces
-Three (physical) interfaces:
-
 For configurations, renaming an interface name and other networking stuff here: https://wiki.archlinux.org/index.php/Systemd-networkd
 
+Three (physical) interfaces:
 * eth-wan
 * eth-lan
 * eth-guest
