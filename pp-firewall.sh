@@ -1,15 +1,12 @@
-#!/bin/sh
+#!/bin/bash
 
-#------------+
-# Some stuff |
-#------------+
 
 IP=/sbin/ip
 IPTABLES=/sbin/iptables 
 ECHO=/bin/echo
 
 #---------+
-# Aliases |
+# ALIASES |
 #---------+
 
 IP_PESCE_PILOTA=
@@ -19,24 +16,20 @@ IP_SERVER=
 # DNS |
 #-----+
 
-DNS_GOOGLE=8.8.8.8
-DNS2_GOOGLE=8.8.4.4
-OPEN_DNS=208.67.222.222 
-OPEN_DNS2=208.67.220.220
-#PI_HOLE=
+# Your DNS Server, using cat /etc/resolv.conf
+DNS_SERVER="8.8.4.4 8.8.8.8 208.67.222.222 208.67.220.220"
 
 #-------+
-# Ports |
-#--------+
+# PORTS |
+#-------+
 
 SSH=22
+DNS=53
 HTTP=80
 
 #------------+
-# Interfaces |
+# INTERFACES |
 #------------+
-
-### Home
 LOCALHOST=127.0.0.1
 
 ### eth-wan
@@ -51,8 +44,9 @@ IP_IFACE_LAN=$($IP addr show $IFACE_LAN | grep "inet\b" | awk {'print $2'} | cut
 IFACE_GUEST=eth-guest
 IP_IFACE_GUEST=$($IP addr show $IFACE_GUEST | grep "inet\b" | awk {'print $2'} | cut -d/ -f1)
 
+
 #--------------------+
-#  Flush the toilet  |
+#  FLUSH THE TOILET  |
 #--------------------+
 
 $ECHO 0 > /proc/sys/net/ipv4/ip_forward
@@ -60,22 +54,25 @@ $ECHO 0 > /proc/sys/net/ipv4/ip_forward
 $IPTABLES -F INPUT
 $IPTABLES -F FORWARD
 $IPTABLES -F OUTPUT
+
 $IPTABLES -P INPUT DROP
 $IPTABLES -P FORWARD DROP
 $IPTABLES -P OUTPUT DROP
 
 $IPTABLES -t nat -F
+$IPTABLES -t nat -X
 $IPTABLES -t mangle -F
+$IPTABLES -t mangle -X
 
 #----------------------+
-#  PREROUTING - Chain  |
+#  PREROUTING - CHAIN  |
 #----------------------+
 
 # Port Forwarding? You need a new router
 #$IPTABLES -A PREROUTING -t nat -i $IFACE_WAN -p tcp --dport http -j DNAT --to $IP_SERVER:$HTTP
 
 #-----------------+
-#  INPUT - Chain  |
+#  INPUT - CHAIN  |
 #-----------------+
 
 #Accept all established or related connections
@@ -84,19 +81,24 @@ $IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Accept Local traffic
 $IPTABLES -A INPUT -s $LOCALHOST -d $LOCALHOST -j ACCEPT
 
+# Pi-Hole listen in all interfaces, drop wan requests
+$IPTABLES -A INPUT -i $IFACE_WAN -p udp --dport $DNS -j DROP
+# Open to Pi-hole dns requests
+$IPTABLES -A INPUT -p udp --dport $DNS -j ACCEPT
+
+# Open to PI-HOLE web-gui (only lan interface)
+$IPTABLES -A INPUT -i $IFACE_LAN -p tcp --dport $HTTP -j ACCEPT
+
 # SSH from PESCE_PILOTA
 $IPTABLES -A INPUT -p tcp -s $IP_PESCE_PILOTA --dport $SSH -j ACCEPT
 # LOG unauthorized SSH connections
 $IPTABLES -A INPUT -p tcp -m state --state NEW --dport $SSH -j LOG --log-prefix "INPUT CHAIN - SSH NOT AUTH "
 
-# HTTP TO SERVER
-$IPTABLES -A INPUT -p tcp -m state --state NEW --dport http -j ACCEPT
-
 # Allow ping WAN interface
 $IPTABLES -A INPUT -i $IFACE_WAN -p icmp -j ACCEPT
 
 #-------------------+
-#  FORWARD - Chain  |
+#  FORWARD - CHAIN  |
 #-------------------+
 
 # Forward established or related connections 
@@ -116,8 +118,9 @@ $IPTABLES -A FORWARD -o $IFACE_WAN -m state --state NEW -j ACCEPT
 # Port forwarding? You need a new router
 #$IPTABLES -A FORWARD -p tcp -d $IP_SERVER --dport http -j ACCEPT
 
-# Log Forward not auth
-$IPTABLES -A FORWARD -j LOG --log-prefix "FORWARD CHAIN - NOT AUTH "
+# Log Forward
+$IPTABLES -A FORWARD -j LOG --log-prefix "FORWARD CHAIN "
+
 
 #------------------+
 #  OUTPUT - CHAIN  |
@@ -127,11 +130,17 @@ $IPTABLES -A FORWARD -j LOG --log-prefix "FORWARD CHAIN - NOT AUTH "
 $IPTABLES -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPTABLES -A OUTPUT -s $LOCALHOST -d $LOCALHOST -j ACCEPT
 
-# Ping the universe from fw
+# Allow Firewall DNS resolution
+for ip in $DNS_SERVER
+do
+	$IPTABLES -A OUTPUT -p udp -d $ip --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+done
+
+# Ping the universe
 $IPTABLES -A OUTPUT -p icmp --icmp-type echo-request -j ACCEPT
 
-# Log Output not auth
-$IPTABLES -A OUTPUT -m state --state NEW -j LOG --log-prefix "OUTPUT CHAIN - NOT AUTH "
+# Log Output
+$IPTABLES -A OUTPUT -m state --state NEW -j LOG --log-prefix "OUTPUT CHAIN "
 
 #-----------------------+
 #  POSTROUTING - CHAIN  |
