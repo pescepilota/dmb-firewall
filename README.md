@@ -1,5 +1,5 @@
-# DMB Firewall
-## A simple home firewall by iptables
+# dmb-firewall
+A simple home firewall with iptables
 
 In development.
 
