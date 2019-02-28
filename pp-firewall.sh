@@ -82,20 +82,21 @@ $IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPTABLES -A INPUT -s $LOCALHOST -d $LOCALHOST -j ACCEPT
 
 # Pi-Hole listen in all interfaces, drop wan requests
-$IPTABLES -A INPUT -i $IFACE_WAN -p udp --dport $DNS -j DROP
+$IPTABLES -A INPUT -i $IFACE_WAN -p udp --dport $DNS -j DROP_LOG
 # Open to Pi-hole dns requests
 $IPTABLES -A INPUT -p udp --dport $DNS -j ACCEPT
 
-# Open to PI-HOLE web-gui (only lan interface)
+# Open PI-HOLE web-gui (only lan interface)
 $IPTABLES -A INPUT -i $IFACE_LAN -p tcp --dport $HTTP -j ACCEPT
 
 # SSH from PESCE_PILOTA
 $IPTABLES -A INPUT -p tcp -s $IP_PESCE_PILOTA --dport $SSH -j ACCEPT
+
 # LOG unauthorized SSH connections
-$IPTABLES -A INPUT -p tcp -m state --state NEW --dport $SSH -j LOG --log-prefix "INPUT CHAIN - SSH NOT AUTH "
+$IPTABLES -A INPUT -p tcp -m state --state NEW --dport $SSH -j LOG --log-prefix " : SSH TOC TOC : "
 
 # Allow ping WAN interface
-$IPTABLES -A INPUT -i $IFACE_WAN -p icmp -j ACCEPT
+$IPTABLES -A INPUT -p icmp -j ACCEPT
 
 #-------------------+
 #  FORWARD - CHAIN  |
@@ -112,15 +113,14 @@ $IPTABLES -A FORWARD -o $IFACE_WAN -m state --state NEW -j ACCEPT
 #$IPTABLES -A FORWARD -i $IFACE_GUEST -o $IFACE_LAN -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Test2 -- Forward from LAN to GUEST
-#$IPTABLES -A FORWARD -i $IFACE_LAN -o $IFACE_GUEST -j ACCEPT
+$IPTABLES -A FORWARD -i $IFACE_LAN -o $IFACE_GUEST -j ACCEPT
 #$IPTABLES -A FORWARD -i $IFACE_LAN -o $IFACE_GUEST -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Port forwarding? You need a new router
 #$IPTABLES -A FORWARD -p tcp -d $IP_SERVER --dport http -j ACCEPT
 
 # Log Forward
-$IPTABLES -A FORWARD -j LOG --log-prefix "FORWARD CHAIN "
-
+$IPTABLES -A FORWARD -j LOG --log-prefix " : FORWARD CHAIN : "
 
 #------------------+
 #  OUTPUT - CHAIN  |
@@ -136,11 +136,14 @@ do
 	$IPTABLES -A OUTPUT -p udp -d $ip --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
 done
 
+# NTP from fw
+$IPTABLES -A OUTPUT -p udp --dport 123 -j ACCEPT
+
 # Ping the universe
 $IPTABLES -A OUTPUT -p icmp --icmp-type echo-request -j ACCEPT
 
-# Log Output
-$IPTABLES -A OUTPUT -m state --state NEW -j LOG --log-prefix "OUTPUT CHAIN "
+# Log Output not auth
+$IPTABLES -A OUTPUT -m state --state NEW -j LOG --log-prefix " : OUTPUT CHAIN : "
 
 #-----------------------+
 #  POSTROUTING - CHAIN  |
@@ -153,4 +156,5 @@ $IPTABLES -t nat -A POSTROUTING -o $IFACE_WAN -j MASQUERADE
 #  I CAN SEE YOU  |
 #-----------------+
 $ECHO 1 > /proc/sys/net/ipv4/ip_forward
+
 
